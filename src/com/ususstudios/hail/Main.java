@@ -18,27 +18,28 @@
 
 package com.ususstudios.hail;
 
+import com.ususstudios.hail.compile.Compiler;
+
+import java.io.*;
+import java.util.Scanner;
+
 public class Main {
 	public static void main(String[] args) throws Exception {
 		if (args.length == 0) {
 			// Shell
-			System.out.print("REPL");
 			REPL();
 		} else {
 			if (args[0].equals("exec")) {
 				// Execute file
 				if (args[1].equals("src")) {
 					// Execute source file directly
-					System.out.println("Execute Source");
 					executeSource(args[2]);
 				} else if (args[1].equals("byte")) {
 					// Execute precompiled bytecode
-					System.out.println("Execute Bytecode");
 					executeBytecode(args[2]);
 				}
 			} else if (args[0].equals("compile")) {
 				// Compile source file to bytecode
-				System.out.println("Compile");
 				compile(args[1], args[2]);
 			} else {
 				System.err.println("Invalid argument: '" + args[0] + "'");
@@ -47,18 +48,87 @@ public class Main {
 		}
 	}
 	
-	public static void REPL() {}
+	public static void REPL() throws Exception {
+		System.out.println("""
+	HailScript Copyright (C) 2024 UsUsStudios
+	This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+	This is free software, and you are welcome to redistribute it
+	under certain conditions; type `show c' for details.
+	To end the terminal, type "exit".
+	""");
+		while (true) {
+			System.out.print("> ");
+			Scanner scanner = new Scanner(System.in);
+			String input = scanner.nextLine();
+			
+			switch (input) {
+				case "show w":
+					System.out.println("THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM “AS IS” WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU. SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR OR CORRECTION.");
+					break;
+				case "show c":
+					File licenseFile = new File("GNU General Public License.txt");
+					Scanner fileScanner = new Scanner(licenseFile);
+					while (fileScanner.hasNextLine()) {
+						System.out.println(fileScanner.nextLine());
+					}
+					break;
+				case "exit":
+					System.exit(0);
+			}
+		}
+	}
 	
 	public static void executeSource(String sourceFile) throws Exception {
-		System.out.println(sourceFile);
+		Scanner scanner = new Scanner(new File(sourceFile));
+		StringBuilder sourceCode = new StringBuilder();
+		while (scanner.hasNextLine()) {
+			sourceCode.append(scanner.nextLine());
+			sourceCode.append('\n');
+		}
+		
+		Compiler compiler = new Compiler(sourceCode.toString());
+		Bytecode bytecode = compiler.compile();
+		System.out.println("Compilation complete successfully.");
+		
+		if (CONSTANTS.DEBUG_PRINT) System.out.println(bytecode);
+		
+		VM vm = new VM(bytecode);
+		vm.execute();
+		System.out.println("Execution complete successfully.");
 	}
 	
 	public static void executeBytecode(String byteFile) throws Exception {
-		System.out.println(byteFile);
+		try (FileInputStream fileIn = new FileInputStream(byteFile);
+		     ObjectInputStream in = new ObjectInputStream(fileIn)) {
+			Bytecode bytecode = (Bytecode) in.readObject();
+			
+			if (CONSTANTS.DEBUG_PRINT) System.out.println(bytecode);
+			
+			VM vm = new VM(bytecode);
+			vm.execute();
+		} catch (IOException i) {
+			System.out.println("File not found: " + byteFile);
+			System.exit(2);
+		}
 	}
 	
-	public static void compile(String sourceFile, String byteFile) throws Exception{
-		System.out.println(sourceFile);
-		System.out.println(byteFile);
+	public static void compile(String sourceFile, String byteFile) throws Exception {
+		Scanner scanner = new Scanner(new File(sourceFile));
+		StringBuilder sourceCode = new StringBuilder();
+		while (scanner.hasNextLine()) {
+			sourceCode.append(scanner.nextLine());
+		}
+		
+		Compiler compiler = new Compiler(sourceCode.toString());
+		Bytecode bytecode = compiler.compile();
+		
+		try (FileOutputStream fileOut = new FileOutputStream(byteFile);
+		     ObjectOutputStream out = new ObjectOutputStream(fileOut)) {
+			out.writeObject(bytecode);
+			System.out.println("Compilation completed successfully.");
+		} catch (IOException i) {
+			System.out.println("File not found: " + byteFile);
+			System.exit(2);
+		}
 	}
 }
